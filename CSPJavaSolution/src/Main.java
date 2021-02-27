@@ -96,8 +96,7 @@ public class Main {
 
 
     //  the heuristic is trying to leave the maximum flexibility for subsequent variable assignments.
-
-    public static ArrayList<Integer> ORDERDOMAINVALUES(Set<Integer> availableColors, Set<Integer> adjacentVertices)
+    public static ArrayList<Integer> ORDERDOMAINVALUES(Set<Integer> availableColors, Set<Integer> neighbors)
     {
         Map<Integer, Integer> colorCountMap = new HashMap<>();
         ArrayList<Integer> sortedColors  = new ArrayList<>();
@@ -107,19 +106,22 @@ public class Main {
         }
 
         // count and update occurrences (inversely) of colors of assigned adjacent vertices
-        for (Integer adjVariableId : adjacentVertices)
+        for (Integer neighborID : neighbors)
         {
-            int adjacentColor = VARIABLES.get(adjVariableId).getColor();
-            if (adjacentColor != -1)
+            int neighborColor = VARIABLES.get(neighborID).getColor();
+            // check if neighbors has a set color
+            if (neighborColor != -1)
             {
-                if (colorCountMap.containsKey(adjacentColor))
+                if (colorCountMap.containsKey(neighborColor))
                 {
-                    colorCountMap.put(adjacentColor, colorCountMap.get(adjacentColor) - 1); // decrease the count
+                    // decrease domain size of the neighbor
+                    colorCountMap.put(neighborColor, colorCountMap.get(neighborColor) - 1);
                 }
             }
         }
 
-        // sort by occurrence values in ascending order
+        // what neighor has minimum colors remained, it should be choosed first
+        // if it fails then no need to do others
         List<Map.Entry<Integer, Integer>> list = new ArrayList<>(colorCountMap.entrySet());
         list.sort(Map.Entry.comparingByValue());
 
@@ -186,12 +188,16 @@ public class Main {
         Set<Integer> neighbors = Xi.getArcs(); // get adjacent vertices
 
         ArrayList<Integer> colors = ORDERDOMAINVALUES(Xi.getDomain(), neighbors);
-        boolean failure = false;    // flag for failures of FC and AC3 checks within CSP
+
+        // as in the book examples failure flag has been set
+        boolean failure = false;
 
         // for each value in ORDER-DOMAIN-VALUES(var , assignment, csp) do
         for (Integer color : colors){
+
             // if value is consistent with assignment then
             if(satisfied(color, neighbors)){
+
                 // add {var = value} to assignment
                 Xi.setColor(color);
 
@@ -205,7 +211,7 @@ public class Main {
                     // inferences ← INFERENCE(csp, var , value) - forward checking
                     if (adjVariable.getDomain().size() == 0) {failure = true; break;}
 
-                    // finding next unassigned variable by minimum remaining value
+                    // mrv is used to find next variable to assign color
                     if (adjVariable.getColor() == -1 && adjVariable.getDomain().size() < minRemainingValue){
                         minRemainingValue = adjVariable.getDomain().size();
                         nextVariableId = neighborID;
@@ -213,7 +219,8 @@ public class Main {
                 }
 
                 // if inferences == failure
-                if (!AC3()) failure = true;
+                if (!AC3())
+                    failure = true;
 
                 // if result return true
                 // recursive call starts
