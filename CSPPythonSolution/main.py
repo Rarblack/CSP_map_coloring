@@ -1,7 +1,65 @@
+def order_domain_values(csp, variable, assignment):
+    """
+    The least-constraining-value (LCV) heuristic is used to sort the list of values during backtracking in the order of the least constraining to most constraining. 
+    This property is measured by how many values a given value "rules out" among other variables. 
+    In other words, the least constraining value would be a value that, when assigned to a variable, would give other variables the maximum number of options to choose from. 
+    """
+    # dictionary to store occurence count of each color in other domains
+    color_occurence_count = {}
+
+    # looping through all possible values in variable domain
+    for color in variable.get_domains():
+
+        # to count the occurence
+        counter = 0
+
+        # looping through all neighbors(since we have only single contraint)
+        for neighbor in variable.get_neighbors():
+
+            # if color is in other domain
+            if color in neighbor.get_domains():
+
+                # increment the counter
+                counter += 1
+        
+            color_occurence_count[color] = counter
+
+
+    return [color[0] for color in sorted(color_occurence_count.items(), key=lambda item: item[1])]
+
+
+def count_constraints(variable):
+    return len(variable.get_neighbors())
+
+def select_unassigned_variable(csp, assignment):
+    """
+    The minimum-remaining-values (MRV) heuristic chooses the next variable to seek assignment by examining how many constraints that variable imposes on remaining variables, and choosing the one with the most constraints. 
+    If there is a tie, a degree heuristic is used to determine which variable will be chosen.
+    """
+    # get all unassigned variables
+    variable = [var for var in csp['variables'].values() if var not in assignment.keys()]
+
+    min = variable[0]
+    
+    for variable in variable:
+
+        # possible size of the domain of the variable
+        variable_domain_size    = len(variable.get_neighbors())
+        min_domain_size         = len(min.get_neighbors())
+        
+        if variable_domain_size < min_domain_size:
+            min = variable
+        elif variable_domain_size == min_domain_size:
+            if count_constraints(variable) > count_constraints(min):
+                min = variable
+    
+    return min
+
+
 def satisfied(variable, neighbor, assignment):
     if neighbor not in assignment:
         return True
-    return assignment[variable.get_name()] == assignment[neighbor.get_name()]
+    return not assignment[variable] == assignment[neighbor]
 
 def consistent(csp, variable, assignment):
     for neighbor in variable.get_neighbors():
@@ -11,28 +69,36 @@ def consistent(csp, variable, assignment):
 
 
 def backtracking_search(csp):
-    return backtrack({}, csp)
+    return backtrack(csp, {})
 
-def backtrack(assignment, csp):
+def backtrack(csp, assignment):
+
     # if assignment is complete then return assignment
     if len(assignment) == len(csp["variables"]):
         return assignment
 
-    # this will be changed to lmi
-    unassigned = [var for var in csp['variables'] if var not in assignment]
+    # choosing an unassinged variable lmi
+    variable = select_unassigned_variable(csp, assignment)
 
-    # getting the first unassigned variable
-    first = csp["variables"][unassigned[0]]
-    for color in first.get_domains():
-        assignment[first] = color
-        if consistent(csp, first, assignment):
-            result = backtrack(assignment, csp)
+    # looping through available domain colors
+    for color in order_domain_values(csp, variable, assignment):
+
+        # assigning color to the first choosen variable
+        assignment[variable] = color
+        
+        # consistency check whether the chosen coler does not violate any rule
+        if consistent(csp, variable, assignment):
+
+            # 
+            result = backtrack(csp, assignment)
+            
+            # if there is a result, return it
             if result:
                 return result
 
-        assignment.remove(first)
+        # the assignment was not correct so, it needs to be erased
+        assignment.pop(variable, None)
     return False
-
 
 
 # the below 2 fuctions is responsible of arc consistency
@@ -41,7 +107,7 @@ def ac_3(csp):
     variables   = csp['variables']
     arcs        = csp['arcs']
 
-    queue = [(variables[x_i], variables[x_j]) for x_i, x_j in arcs]
+    queue       = [(variables[x_i], variables[x_j]) for x_i, x_j in arcs]
 
     while queue:
         (x_i, x_j) = queue.pop(0)
@@ -79,12 +145,19 @@ def revise(x_i, x_j):
     return revised
 
 
+
+
+
+# ---------------------------------------------MAIN 
 from custom_parser import Parser
 from variable import Variable
-
+import sys
 
 if __name__ == "__main__":
-    parser = Parser("input.txt")
+
+    filename = sys.argv[1]
+
+    parser = Parser(filename)
     parser.parse()
 
     # getting read data
@@ -109,4 +182,9 @@ if __name__ == "__main__":
     ac_3(csp)
 
     assignment = backtracking_search(csp)
-    print(assignment)
+
+    if assignment:
+        for k, v in assignment.items():
+            print(f'{k.get_name()}: {v}')
+    else:
+        print("NO SOLUTION")
